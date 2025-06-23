@@ -1,0 +1,12 @@
+library(tidyverse)
+
+install.packages("corrr")
+library(corrr)
+# load data
+child_data <- analytic_data2025_v2_csv
+
+library(readr)        # tidyverse reader
+library(janitor)      # optional, for nicer names
+
+child_data1 <- analytic_data2025_v3
+glimpse(child_data1)
