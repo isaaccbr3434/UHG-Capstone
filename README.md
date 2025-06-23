@@ -5,11 +5,10 @@ library(tidyverse)
 
 install.packages("corrr")
 library(corrr)
-# load data
-child_data <- analytic_data2025_v2_csv
 
 library(readr)        # tidyverse reader
 library(janitor)      # optional, for nicer names
 
+#this is what I'm calling the dataset... i also deleted the row from Excel instead of R
 child_data1 <- analytic_data2025_v3
 glimpse(child_data1)
