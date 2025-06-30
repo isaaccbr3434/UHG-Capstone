@@ -1,12 +1,454 @@
+# Load libraries
 library(tidyverse)
-
+install.packages("ranger")
 install.packages("corrr")
 library(corrr)
 # load data
-child_data <- analytic_data2025_v2_csv
 
 library(readr)        # tidyverse reader
 library(janitor)      # optional, for nicer names
 
 child_data1 <- analytic_data2025_v3
 glimpse(child_data1)
+
+names(child_data1)
+
+library(dplyr)
+library(stringr)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#Modeling with numerator and denominator instead
+
+library(MASS)    
+library(broom)    
+library(ranger)
+
+mod_df <- child_data1 |> 
+  transmute(
+    # outcome & offset ----------------
+    deaths_child  = as.numeric(v128_numerator),
+    pop_child     = as.numeric(v128_denominator),
+    
+    # predictor counts -----------------
+    deaths_injury     = as.numeric(v135_numerator),
+    deaths_homicide   = as.numeric(v015_numerator),
+    deaths_suicide    = as.numeric(v161_numerator),
+    deaths_vehicle    = as.numeric(v039_numerator),
+    deaths_firearm    = as.numeric(v148_numerator),
+    year, county, state
+  ) |> 
+  filter(!is.na(deaths_child), !is.na(pop_child))
+
+nb_fit <- glm.nb(
+  deaths_child ~ deaths_injury + deaths_homicide +
+    deaths_suicide + deaths_vehicle +
+    deaths_firearm +                    
+    offset(log(pop_child)),
+  data = mod_df
+)
+
+summary(nb_fit)
+
+library(broom)
+
+tbl <- tidy(nb_fit, exponentiate = TRUE, conf.int = TRUE) |> 
+  filter(term != "(Intercept)") |> 
+  mutate(term = recode(term,
+                       deaths_injury   = "All injuries",
+                       deaths_homicide = "Homicide",
+                       deaths_suicide  = "Suicide",
+                       deaths_vehicle  = "Motor-vehicle",
+                       deaths_firearm  = "Firearm"         
+  ))
+
+ggplot(data = tbl,
+       aes(x = reorder(term, estimate), y = estimate)) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_flip() +
+  labs(
+    title = "Rate-ratios for child mortality (negative-binomial model)",
+    x     = NULL,
+    y     = "RR (95% CI)",
+    caption = "Outcome: v128_numerator with log(pop_child) offset.\nPredictors: injury, homicide, suicide, motor-vehicle, firearm deaths."
+  ) +
+  theme_minimal(base_size = 12)
+
+#Social factors---------------------------------------------------------------------
+
+library(dplyr)
+
+child_data1 |>
+  transmute(
+    deaths_child = v128_numerator,
+    pop_child    = v128_denominator,
+    
+    lack_support_rate       = v184_numerator / v184_denominator,
+    disconnected_youth_rate = v149_numerator / v149_denominator,
+    hs_completion_rate      = v168_numerator / v168_denominator,
+    children_poverty_rate   = v024_numerator / v024_denominator,
+    loneliness_rate         = v183_numerator / v183_denominator,
+    teen_birth_rate         = v014_numerator / v014_denominator,
+    school_segregation_rate = v167_numerator / v167_denominator,
+    school_funding_rate     = v169_numerator / v169_denominator,
+    free_lunch_rate         = v065_numerator / v065_denominator,
+    child_care_rate         = v172_numerator / v172_denominator
+  ) |>
+  summarise(
+    across(everything(),
+           ~ sum(!is.na(.x) & is.finite(.x)), .names = "n_nonmiss_{.col}")
+  ) |>
+  tidyr::pivot_longer(everything(),
+                      names_to  = "variable",
+                      values_to = "rows_non_missing") |>
+  arrange(rows_non_missing)
+
+model_df <- child_data1 |>
+  filter(v128_denominator > 0) |>
+  transmute(
+    pop_child            = v128_denominator,                       
+    child_mort_rate      = v128_numerator / v128_denominator,      
+    
+    disconnected_youth_rate = v149_numerator / v149_denominator,
+    hs_completion_rate      = v168_numerator / v168_denominator,
+    free_lunch_rate         = v065_numerator / v065_denominator,
+    teen_birth_rate         = v014_numerator / v014_denominator,
+    child_care_rate         = v172_numerator / v172_denominator
+  ) |>
+  mutate(across(everything(),
+                ~ ifelse(is.finite(.x), .x, NA_real_)))
+lm_fit <- lm(
+  child_mort_rate ~
+    disconnected_youth_rate +
+    hs_completion_rate      +
+    free_lunch_rate         +
+    teen_birth_rate         +
+    child_care_rate,
+  data    = model_df,
+  weights = pop_child         
+)
+tidy(lm_fit, conf.int = TRUE) |>
+  filter(term != "(Intercept)") |>
+  arrange(desc(abs(estimate))) |>
+  print()
+
+tidy(lm_fit, conf.int = TRUE) |>
+  filter(term != "(Intercept)") |>
+  mutate(term = dplyr::recode(term,
+                              disconnected_youth_rate = "Disconnected youth",
+                              hs_completion_rate      = "High-school completion",
+                              free_lunch_rate         = "Free / reduced-price lunch",
+                              teen_birth_rate         = "Teen births",
+                              child_care_rate         = "Child-care centres"
+  )) |>
+  ggplot(aes(x = reorder(term, estimate), y = estimate)) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  labs(
+    title    = "Social-environment predictors of child-mortality rate",
+    subtitle = "Weighted linear model (weight = child population)",
+    x        = NULL,
+    y        = "Coefficient ± 95 % CI\n(change in child-mortality rate)",
+    caption  = "Positive values ⇒ higher mortality; negative ⇒ protective"
+  ) +
+  theme_minimal(base_size = 12)
+
+
+#Teen births and Firearm deaths vs HS graduation
+
+dat <- child_data1 |>
+  filter(v168_denominator > 0) |>
+  transmute(
+    pop_child            = v128_denominator,                          
+    hs_completion_rate   = v168_numerator / (v168_denominator + 1),   
+    teen_birth_rate      = v014_numerator / (v014_denominator + 1),
+    firearm_death_rate   = v148_numerator / (v148_denominator + 1)
+  )
+
+lm_hs <- lm(
+  hs_completion_rate ~ teen_birth_rate + firearm_death_rate,
+  data    = dat,
+  weights = pop_child
+)
+
+tidy(lm_hs, conf.int = TRUE)
+
+dat |>
+  tidyr::pivot_longer(
+    cols      = c(teen_birth_rate, firearm_death_rate),
+    names_to  = "predictor", values_to = "rate"
+  ) |>
+  mutate(predictor = dplyr::recode(predictor,
+                                   teen_birth_rate    = "Teen-birth rate",
+                                   firearm_death_rate = "Firearm-death rate")) |>
+  ggplot(aes(x = rate, y = hs_completion_rate)) +
+  geom_point(alpha = .25, size = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.9) +
+  facet_wrap(~ predictor, scales = "free_x") +
+  labs(
+    title    = "Association of teen births & firearm deaths with high-school completion",
+    x        = "Predictor rate (per population)",
+    y        = "High-school-completion rate",
+    caption  = "Weighted linear fit; point transparency reflects over-plotting"
+  ) +
+  theme_minimal(base_size = 12)
+
+
+#Child mortality and firearm death by race
+
+race_df <- child_data1 |>
+  transmute(
+    teen_birth_rate = v014_numerator / (v014_denominator + 1),
+    
+    aian_rate   = v128_race_aian   / (v128_denominator + 1),
+    asian_rate  = v128_race_asian  / (v128_denominator + 1),
+    black_rate  = v128_race_black  / (v128_denominator + 1),
+    hisp_rate   = v128_race_hispanic / (v128_denominator + 1),
+    white_rate  = v128_race_white  / (v128_denominator + 1),
+    nhopi_rate  = v128_race_nhopi  / (v128_denominator + 1),
+    
+   
+    pop_child   = v128_denominator                     
+  )
+
+race_long <- race_df |>
+  pivot_longer(
+    cols      = ends_with("_rate") & !starts_with("teen"),
+    names_to  = "race",
+    values_to = "child_mort_rate"
+  ) |>
+  mutate(race = recode(race,
+                       aian_rate  = "AIAN",
+                       asian_rate = "Asian",
+                       black_rate = "Black",
+                       hisp_rate  = "Hispanic",
+                       white_rate = "White",
+                       nhopi_rate = "NHOPI"))
+#below is the linear regression weighted on population
+ggplot(race_long,
+       aes(x = teen_birth_rate, y = child_mort_rate)) +
+  geom_point(alpha = 0.25, size = 0.7) +
+  geom_smooth(method = "lm", se = TRUE,
+              aes(weight = pop_child), linewidth = 0.9) +
+  facet_wrap(~ race, scales = "free") +
+  labs(
+    x        = "Teen-birth rate (births / population)",
+    y        = "Child-mortality rate (deaths / population)",
+    caption  = "Lines: weighted linear fit (weight = total child population)"
+  ) +
+  theme_minimal(base_size = 12)
+
+#firearm fatalities by race against child mortality by race
+
+library(dplyr)
+library(ranger)
+library(tibble)
+
+race_raw <- child_data1 |>
+  transmute(
+    ff_aian   = v148_race_aian,
+    cm_aian   = v128_race_aian,
+    ff_asian  = v148_race_asian,
+    cm_asian  = v128_race_asian,
+    ff_black  = v148_race_black,
+    cm_black  = v128_race_black,
+    ff_hisp   = v148_race_hispanic,
+    cm_hisp   = v128_race_hispanic,
+    ff_white  = v148_race_white,
+    cm_white  = v128_race_white,
+    ff_nhopi  = v148_race_nhopi,
+    cm_nhopi  = v128_race_nhopi
+  )
+
+corr_tbl <- tibble(
+  race = c("AIAN", "Asian", "Black", "Hispanic", "White", "NHOPI"),
+  correlation = c(
+    cor(race_raw$ff_aian,  race_raw$cm_aian,  use = "pairwise.complete.obs"),
+    cor(race_raw$ff_asian, race_raw$cm_asian, use = "pairwise.complete.obs"),
+    cor(race_raw$ff_black, race_raw$cm_black, use = "pairwise.complete.obs"),
+    cor(race_raw$ff_hisp,  race_raw$cm_hisp,  use = "pairwise.complete.obs"),
+    cor(race_raw$ff_white, race_raw$cm_white, use = "pairwise.complete.obs"),
+    cor(race_raw$ff_nhopi, race_raw$cm_nhopi, use = "pairwise.complete.obs")
+  )
+) |>
+  arrange(desc(abs(correlation)))
+
+print(corr_tbl)    # ranked by |ρ|
+
+corr_tbl |>
+  ggplot(aes(x = reorder(race, abs(correlation)),
+             y = abs(correlation))) +
+  geom_col(fill = "darkblue") +
+  coord_flip() +
+  labs(
+    x     = NULL,
+    y     = "| Pearson ρ |"
+  ) +
+  theme_minimal(base_size = 15)
+
+
+#teen birth and child mortality by race
+
+race_raw <- child_data1 |>
+  transmute(
+    tb_aian   = v014_race_aian,
+    cm_aian   = v128_race_aian,
+    tb_asian  = v014_race_asian,
+    cm_asian  = v128_race_asian,
+    tb_black  = v014_race_black,
+    cm_black  = v128_race_black,
+    tb_hisp   = v014_race_hispanic,
+    cm_hisp   = v128_race_hispanic,
+    tb_white  = v014_race_white,
+    cm_white  = v128_race_white,
+    tb_nhopi  = v014_race_nhopi,
+    cm_nhopi  = v128_race_nhopi
+  )
+
+corr_tbl <- tibble(
+  race = c("AIAN", "Asian", "Black", "Hispanic", "White", "NHOPI"),
+  correlation = c(
+    cor(race_raw$tb_aian,  race_raw$cm_aian,  use = "pairwise.complete.obs"),
+    cor(race_raw$tb_asian, race_raw$cm_asian, use = "pairwise.complete.obs"),
+    cor(race_raw$tb_black, race_raw$cm_black, use = "pairwise.complete.obs"),
+    cor(race_raw$tb_hisp,  race_raw$cm_hisp,  use = "pairwise.complete.obs"),
+    cor(race_raw$tb_white, race_raw$cm_white, use = "pairwise.complete.obs"),
+    cor(race_raw$tb_nhopi, race_raw$cm_nhopi, use = "pairwise.complete.obs")
+  )
+) |>
+  arrange(desc(abs(correlation)))
+
+print(corr_tbl)
+
+corr_tbl |>
+  ggplot(aes(x = reorder(race, abs(correlation)),
+             y = abs(correlation))) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Teen-births vs child mortality – strength of association by race",
+    x     = NULL,
+    y     = "| Pearson ρ |  (larger = stronger link)"
+  ) +
+  theme_minimal(base_size = 12)
+
+###############################################################################
+
+#This is a larger predictive model for CM
+
+library(dplyr)
+library(MASS)
+library(broom)
+
+
+library(dplyr)
+library(tidyr)
+install.packages("cluster")
+library(cluster)
+
+library(scales)
+
+# this is the cluster PCA for socioeconomic clusters for teen birth risk
+tb_df <- child_data1 |>
+  group_by(state, year) |>
+  summarise(
+    ## outcome (teen births) ----
+    teen_births  = sum(v014_numerator, na.rm = TRUE),
+    pop_teen     = sum(v014_denominator, na.rm = TRUE),
+    
+    ## predictor raw counts ----
+    uninsured_adults   = sum(v003_numerator, na.rm = TRUE),
+    pop_adults         = sum(v003_denominator, na.rm = TRUE),
+    
+    broadband_access   = mean(v166_rawvalue, na.rm = TRUE),            # already %
+    hs_completion      = sum(v168_numerator, na.rm = TRUE) /
+      (sum(v168_denominator, na.rm = TRUE) + 1),
+    
+    healthy_food_env   = mean(v083_rawvalue, na.rm = TRUE),            # index 0–10
+    some_college       = sum(v069_numerator, na.rm = TRUE) /
+      (sum(v069_denominator, na.rm = TRUE) + 1),
+    
+    children_poverty   = sum(v024_numerator, na.rm = TRUE) /
+      (sum(v024_denominator, na.rm = TRUE) + 1),
+    
+    food_insecurity    = mean(v139_rawvalue, na.rm = TRUE),            # if scalar
+    life_expectancy    = mean(v147_rawvalue, na.rm = TRUE),            # years
+    
+    .groups = "drop"
+  ) |>
+  mutate(
+    teen_birth_rate   = teen_births / (pop_teen + 1),
+    uninsured_rate    = uninsured_adults / (pop_adults + 1)
+  )
+
+clust_mat <- tb_df |>
+  transmute(
+    uninsured_rate,
+    broadband_access,
+    hs_completion,
+    healthy_food_env,
+    some_college,
+    children_poverty,
+    food_insecurity,
+    life_expectancy
+  ) |>
+  mutate(across(everything(),
+                ~ ifelse(is.finite(.x), .x, NA_real_))) |>
+  mutate(across(everything(),
+                ~ ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))) |>
+  mutate(across(everything(), scale))
+
+## drop constant columns
+keep <- sapply(clust_mat, function(z) sd(z) > 0)
+clean_mat <- clust_mat[, keep]
+
+wss <- sapply(2:8, function(k)
+  kmeans(clean_mat, centers = k, nstart = 25)$tot.withinss)
+
+plot(2:8, wss, type = "b",
+     main = "Elbow plot", xlab = "k", ylab = "Within-cluster SS")
+
+sil <- sapply(2:8, function(k) {
+  km <- kmeans(clean_mat, centers = k, nstart = 25)
+  mean(cluster::silhouette(km$cluster, dist(clean_mat))[, 3])
+})
+
+plot(2:8, sil, type = "b",
+     main = "Silhouette width", xlab = "k", ylab = "Mean silhouette")
+
+
+k <- 4
+set.seed(2025)
+km <- kmeans(clean_mat, centers = k, nstart = 50)
+tb_df$cluster <- factor(km$cluster)
+
+pca <- prcomp(clean_mat, center = FALSE, scale. = FALSE)
+
+plot_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  cluster = tb_df$cluster
+)
+
+ggplot(plot_df,
+       aes(PC1, PC2, colour = cluster)) +
+  geom_point(size = 2, alpha = 0.7) +
+  stat_ellipse(level = 0.68, linewidth = 0.6) +
+  labs(
+    title = "Socio-economic clusters linked to high teen-birth risk",
+    subtitle = "PCA of eight predictors; points = state-year",
+    x = "PC1", y = "PC2", colour = "Cluster"
+  ) +
+  theme_minimal(base_size = 12)
+
+pred_names <- colnames(clean_mat)   
+
+aggregate(
+  tb_df[, pred_names],              
+  list(cluster = tb_df$cluster),
+  mean
+)
