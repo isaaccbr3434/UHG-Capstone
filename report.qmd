@@ -1,0 +1,154 @@
+---
+title: "Teen Birth Trends: Addressing Intergenerational Effects"
+author:
+  - Olivia Kim
+  - Gedeon Rugema
+  - Isaac Calderon
+date: 2025-07-25
+bibliography: references.bib
+csl: apa.csl
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    self-contained: true
+    section-divs: true
+    html-math-method: katex
+---
+
+---
+
+## Introduction 
+
+In 2023 alone, approximately 160,000 births were recorded among mothers younger than 20 years old—a rate more than three times higher than that observed in most other high-income nations [@Congress2025]. Despite the decreasing trend over the past two decades, teen births remain a public health challenge. However, this burden is not evenly distributed; it disproportionately affects rural counties and regions in the Southern United States, which report the highest rates of teen births.
+
+The implications of teen childbearing extend beyond immediate maternal outcomes, significantly influencing a wide array of adverse outcomes for their offspring. Extensive empirical research has documented associations between teen parenthood and increased risks of low birth weight, premature birth, and elevated infant mortality. Furthermore, children born to teenage parents exhibit lower kindergarten-readiness scores and higher rates of dropping out of high school. In the long term, teen births correlate with reduced lifetime earnings, increased reliance on social safety-net programs, and heightened prevalence of chronic health issues such as obesity, depression, and chronic diseases during young adulthood [@Congress2025]. These associations suggest that teen parenthood may perpetuate intergenerational cycles of socioeconomic disadvantage, highlighting its importance as a critical target for public health policy intervention.
+
+Despite these observed correlations, it remains uncertain whether poor child outcomes are direct consequences of early parenthood or result from underlying systemic factors such as poverty, limited educational opportunities, or inadequate access to healthcare, which predispose adolescents to early childbearing. Not only does teen birth result in poorer outcomes for offspring, but also for teen mothers who face greater economic vulnerability due to reduced participation in higher education and the labor market. 
+
+Several factors have contributed to the decline in U.S. teen birth rates over recent decades. The most significant contributors are improved contraceptive use—including greater reliance on effective, long-acting methods—and, to a lesser extent, a reduction in sexual activity among younger teens [@Geiger2019]. Broader social and economic factors, such as increased access to education and job opportunities, may also play a role. 
+
+Given these complexities, our study aims to identify counties and populations at the highest risk of teen birth to more accurately target resources and policy interventions. Specifically, we seek actionable insights into the policy debate surrounding disparities in reproductive healthcare access and early family planning, which have been exacerbated by varying state-level policies enacted in recent years. By examining county-level data, we aim to clarify whether teen parenthood itself is a determinant of negative child outcomes or a consequence of broader structural factors, informing more effective and targeted intervention strategies.
+
+
+## Data
+
+This analysis uses the 2025 National County Health Release data, which provides county-level information on key socioeconomic and health-related factors, accessed from the County Health Rankings & Roadmaps website. Missing data points were imputed using mean replacement.
+
+Feature selection was performed using machine learning algorithms to identify the most predictive variables while reducing overfitting and noise.
+
+We also incorporated Kaiser Family Foundation survey data on state-level health insurance coverage for children (ages 0–18), which reports the proportion insured by employer plans, Medicaid, other public sources, non-group plans, and those uninsured. The most recent available data was used, which was from 2023.
+
+**Outcome Variable:**  
+- *Teen births:* Number of births per 1,000 female population ages 15–19
+
+**Top Four Predictors:**  
+- *High school completion:* Percentage of adults (25+) with a high school diploma or equivalent  
+- *Uninsured adults:* Percentage of adults under 65 without health insurance  
+- *Food insecurity:* Percentage of the population lacking adequate access to food  
+- *Some college:* Percentage of adults ages 25–44 with some post-secondary education
+
+## Methods
+
+We conducted a linear regression analysis using techniques such as Ridge and LASSO Regression using regularization in order to identify the ten variables exhibiting the strongest correlations with teen birth rates (TBR). Subsequently, we utilized Gaussian Mixed Models (GMM) and PCA to categorize counties into clusters based on their similarities in predictor variables and TBR. Three distinct clusters emerged from this analysis: counties with high TBR accompanied by poor socioeconomic predictors, counties with low TBR and favorable socioeconomic predictors, and counties demonstrating intermediate characteristics.
+
+The application of GMM provided greater flexibility by calculating the probabilistic associations of counties within each cluster, overcoming limitations associated with traditional clustering methods such as k-means, which impose arbitrary and rigid divisions between clusters. By determining probabilistic cluster memberships, we enhanced the robustness and interpretability of our county classifications. Furthermore in order to conduct feature selection we used two separate methods. The first method involved creating a decision tree where the leaf nodes were the three different cluster assignments that we came up with using the GMM and then determining the rankings of the most important features based on metrics such as gini index. The second method involved separating counties into three distinct categories based on tertiles of the counties’ raw teen birth rates. We then trained a random forest model and plotted a feature importance table.
+
+To ensure meaningful relationships and avoid misinterpretation in our policy analysis, we eliminated certain variables, such as the rate of some college attendance, which, despite showing a strong positive correlation with TBR, was likely an outcome rather than a predictor. We then focused on creating predictions based on combinations of probabilities to classify teen birth risk groups rather than relying solely on linear associations with TBR.
+
+Following the identification and refinement of county clusters, we developed risk classifications—high, intermediate, and low—for teen births based on primary predictor variables and observed TBR. These risk classifications enabled further investigation into what socioeconomic factors drive TBRs. 
+
+We began by conducting a statewide landscape assessment of teen‐birth intervention strategies, focusing on both health‐coverage and socioeconomic drivers. First, we ran comparative analyses of state‐level payor mixes—calculating the proportion of children covered by employer‐sponsored insurance, Medicaid/other public plans, and those uninsured—and evaluated their correlations with teen birth rates. Next, we explored contextual predictors related to educational attainment, hypothesizing that areas with greater food insecurity may face barriers to school attendance and completion, thereby elevating teen pregnancy risk.
+
+
+## Results
+
+Where one lives is a strong predictor for teen birth risk. The geographic regions predominantly in the Southern United States have worse outcomes: the highest TBR, shorter life expectancy, worse access to resources, etc. Contrastingly, the Northeast and northern Midwest tend to be assigned to the lowest-risk cluster, with the best health and socioeconomic outcomes. The counties in the West tend to fall into the intermediate risk cluster (Fig. 1).
+
+**Where are the highest risk counties?**
+
+:::{.column-page}
+![Fig. 1: County-level distribution of risk-based clusters for TBR and socioeconomic predictors](C:\Users\Olivia\cmu\figures\map.png){fig-align="center" width="60%"}
+:::
+
+This study identified four key variables that determined risk-cluster assignment for TBR: adult uninsured status, food insecurity, some college completion, and high school completion rates. The strong correlation between lower educational attainment and higher teen birth rates is well-supported—teen childbearing often disrupts schooling, as physical demands of pregnancy and the responsibilities of early parenthood can make it difficult for teens to remain in or complete school.
+
+**Identifying the top four socioeconomic predictors**
+
+:::{.column-page}
+![Fig. 2: Decision tree shows the level of importance for each top predictor in assigning counties to a cluster for teen birth risk.](C:\Users\Olivia\cmu\figures\dt.png){fig-align="center" width="60%"}
+:::
+
+The food insecurity and adult uninsured status also emerged as influential predictors. While there is limited prior research on the connection between food insecurity and TBR, our findings suggest that poorer food insecurity may signal broader socioeconomic disadvantage. Areas with higher food insecurity scores are likely to experience not just limited access to healthy foods, but also to other critical resources, which may contribute to higher teen birth rates. Food insecurity may also be a reflection of household circumstances where a child may have to prioritize participating in the labor force or spending time outside of school, obtaining food or other essentials for themselves and their family. This relationship warrants further investigation to understand better the pathways linking food insecurity, resource availability, and teen pregnancy.
+
+Interestingly, the random forest model identified the same top four features as the GMM combined with the single decision tree. Furthermore, the XGBoost model identified the same top features, ensuring confidence that we have found the most relevant features within the dataset. The shapes of the relationships between the top-identified predictors and TBR were confirmed using general additive models. 
+
+**Visualization of predictor relationships using GAM**
+
+:::{.column-page}
+![Fig. 3: Adjusted effects of four key predictors on teen birth rates, estimated using generalized additive models.](C:\Users\Olivia\cmu\figures\GAM result.png){fig-align="center" width="60%"}
+:::
+
+Visualization of the relationships of these predictors against TBR was confirmed through general additive models. The relationship between food insecurity and TBR was strongly positive and linear, with TBR increasing steeply at higher levels of food insecurity (Fig. 3, top left). Higher rates of adults with “some college” experience were associated with a linear decrease in TBR, suggesting educational attainment is protective (Fig. 3, top right). The effect of high school completion on TBR showed a mild nonlinear pattern: TBR decreased with increasing high school completion rates, with diminishing returns at the highest levels (Fig. 3, bottom left). Higher rates of uninsured adults were associated with modest increases in TBR, but the effect was less pronounced than for the other predictors (Fig. 3, bottom right).
+Analysis of the KFF data also highlighted differences in insurance coverage profiles between states. States with the highest TBRs tended to have higher proportions of residents who were uninsured or who relied on Medicaid or other public insurance programs. In contrast, states with the lowest TBRs were characterized by higher rates of employer-sponsored insurance coverage. These findings point to the importance of insurance coverage—and, more broadly, access to affordable health care—as a potential lever for reducing teen pregnancies and improving overall child and adolescent outcomes.
+
+**State TBRs against insurance status of children**
+
+:::{.column-page}
+![Fig. 4: States are listed in descending order of TBR, which is shown by the black dots. For each state, the payor mix of children ages 0-18 is shown.](C:\Users\Olivia\cmu\figures\insurance.png){fig-align="center" width="60%"}
+:::
+
+States in the highest teen birth rate quartile had a significantly higher proportion of children with non-employer-based insurance coverage (mean = 56.8%) compared to those in the lowest quartile (mean = 45.8%; t = 5.74, p < 0.001; 95% CI for the difference: 7.0% to 15.0%).
+Linear regression was used to create a policy simulation, which revealed that even a modest improvement in several key variables can lead to a significant reduction in TBR. Specifically, the analysis suggests that a 2% decrease in food insecurity and a 3% reduction in the number of uninsured adults, along with a 2% increase in high school graduation rates and a 1% increase in some college attendance, could result in four fewer teen births per 1,000 females.
+
+**Small changes in policy yield noticable decrease in teen births**
+
+:::{.column-page}
+![Fig. 5: Policy simulation shows that small shifts in policy surrounding socioeconomic context can lead to substantial changes in TBR.](C:\Users\Olivia\cmu\figures\policy.png){fig-align="center" width="60%"}
+:::
+
+## Recommendations
+Based on our findings, we recommend that UnitedHealth Group and its partners prioritize programs that:
+
+::: {.callout}
+* Increase access to comprehensive health insurance for adolescents and their families, especially in states with high rates of uninsurance or Medicaid reliance.
+
+* Support educational attainment through targeted interventions aimed at reducing high school dropout rates and promoting college enrollment among teens at risk for early childbearing.
+
+* Integrate reproductive health education and access into both school and community health settings to empower teens with knowledge and resources to prevent unintended pregnancies.
+
+* Leverage analytics to identify and target high-risk populations, ensuring resources are directed where they will have the greatest impact on both maternal and child outcomes.
+:::
+
+These recommendations are aimed at breaking cycles of disadvantage and ensuring healthier futures for adolescents and their children.
+
+
+## Discussion
+
+From our analysis, food insecurity appears to be a robust proxy for broader socioeconomic deprivation and limited resource availability. Jurisdictions with higher levels of food insecurity tend to have elevated teen birth rates, likely because chronic food stress forces adolescents to prioritize work or caretaking over school, reducing educational engagement and increasing pregnancy risk. Supporting this, research on voting restrictions has shown that areas with more barriers to civic participation—often mirroring impoverished regions with weaker healthcare infrastructure—also experience higher teen birth rates [@Pabayo2023].
+
+We also observed that states with higher adult uninsurance rates have higher teen birth rates, reflecting diminished access to health education and reproductive services among families. Importantly, educational attainment variables further reinforce this picture: counties with lower high-school graduation rates and smaller proportions of adults with any college experience exhibit the highest teen birth rates. This inverse relationship suggests that sustained engagement in secondary and post-secondary education provides protective effects against early childbearing, whether through increased access to resources, education, stronger support networks, or delayed entry into parenting.
+
+Together, these findings highlight the interplay between material hardship, healthcare access, and educational opportunity in shaping teen pregnancy risk. Interventions that simultaneously improve food security, expand insurance coverage, and bolster high-school completion and college enrollment are therefore critical to reducing teen birth rates and mitigating their intergenerational consequences.
+
+*Limitations:*
+
+::: {.callout}
+* Causality: Our analyses were primarily correlational and probabilistic; thus, they do not definitively establish causal relationships between teen birth rates and child outcomes. Although we accounted for multiple predictors, unmeasured confounding variables may still influence the associations observed.
+
+* Data Granularity: The dataset used was at the county level, potentially masking significant within-county variations. Individual-level data might offer more precise insights into the relationships between teen birth rates and child outcomes, as well as the effectiveness of interventions.
+
+* Exclusion of Relevant Variables: Due to data limitations, some potentially influential factors—such as specific cultural attitudes, family support structures, community-level social services, or detailed quality of education—were not included in the analysis. The absence of these variables might limit the comprehensiveness of our findings.
+
+* Temporal Constraints: Our study uses cross-sectional data from a single year (2025), limiting our ability to observe trends, fluctuations, or longer-term dynamics that might impact teen birth rates and child outcomes. Longitudinal data would improve our understanding of these relationships and inform policy interventions more effectively.
+:::
+Teen birth rates are a powerful indicator for child and community well-being because they are closely linked to long-term health, educational, and economic outcomes—both for young mothers and their children. Numerous studies demonstrate that children born to teen mothers face a higher risk of adverse outcomes ranging from health status to economic status. These effects often extend into adolescence and adulthood, perpetuating cycles of disadvantage across generations.
+
+For healthcare organizations and policymakers, monitoring teen birth rates as a public-health metric is critical for assessing how social determinants and barriers to care contribute to intergenerational health disparities. Teen pregnancy is strongly associated with socioeconomic factors such as income, education, and access to reproductive health services—issues that lie at the heart of public health and health equity efforts [@Congress2025]. Interventions targeting the child-adolescent population are particularly impactful, as supporting young people during this critical developmental period can break cycles of poor outcomes and drive meaningful change for entire communities.
+
+Additionally, the topic of teen birth rates is especially timely given the current national debate around reproductive health access. As states revisit policies affecting contraception, abortion, and sexual health education, understanding the patterns and predictors of teen pregnancy is essential for designing effective, equitable, and evidence-based interventions. For UnitedHealth Group and others working at the intersection of health analytics and strategy, focusing on teen birth rates can inform smarter resource allocation, identify populations most in need of support, and help drive improvements in child and maternal health outcomes.
+
+
+
+
